@@ -1,5 +1,6 @@
 package com.subhanmishra.order;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -17,11 +18,13 @@ public class OutboxPublisher {
 
 
     private final OrderOutboxRepository orderOutboxRepository;
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final KafkaTemplate<Object, Object> kafkaTemplate;
+    private final ObjectMapper objectMapper;
 
-    public OutboxPublisher(OrderOutboxRepository orderOutboxRepository, KafkaTemplate<String, String> kafkaTemplate) {
+    public OutboxPublisher(OrderOutboxRepository orderOutboxRepository, KafkaTemplate<Object, Object> kafkaTemplate, ObjectMapper objectMapper) {
         this.orderOutboxRepository = orderOutboxRepository;
         this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Scheduled(fixedDelay = 1000) // every second
@@ -31,10 +34,8 @@ public class OutboxPublisher {
         for (OrderOutbox event : events) {
             try {
                 kafkaTemplate.send(ORDER_EVENTS_TOPIC,
-                        String.valueOf(event.aggregateId()),
-                        event.payload());
-                OrderOutbox updatedEvent = new OrderOutbox(event.id(), event.aggregateType(), event.aggregateId(), event.type(), event.payload(), "SENT", event.createdAt(), Instant.now());
-                OrderOutbox savedEvent = orderOutboxRepository.save(updatedEvent);
+                        String.valueOf(event.aggregateId()), objectMapper.readValue(event.payload(), OrderEvent.class));
+                OrderOutbox savedEvent = orderOutboxRepository.save(new OrderOutbox(event.id(), event.aggregateType(), event.aggregateId(), event.type(), event.payload(), "SENT", event.createdAt(), Instant.now()));
                 log.info("Published outbox event id={}", savedEvent.id());
             } catch (Exception ex) {
                 log.error("Failed to publish outbox event id={}", event.id(), ex);
