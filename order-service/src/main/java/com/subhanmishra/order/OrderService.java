@@ -1,8 +1,9 @@
 package com.subhanmishra.order;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,18 +15,20 @@ public class OrderService {
     private static final String ORDER_EVENTS_TOPIC = "order_events";
 
     private final OrderRepository orderRepository;
-    private final KafkaTemplate<Object, Object> kafkaTemplate;
+    private final OrderOutboxRepository orderOutboxRepository;
+    private final ObjectMapper objectMapper;
 
     public OrderService(OrderRepository orderRepository,
-                        KafkaTemplate<Object, Object> kafkaTemplate) {
+                        OrderOutboxRepository orderOutboxRepository, ObjectMapper objectMapper) {
         this.orderRepository = orderRepository;
-        this.kafkaTemplate = kafkaTemplate;
+        this.orderOutboxRepository = orderOutboxRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
-    public Order createOrder(OrderRequest request) {
+    public Order createOrder(OrderRequest request) throws JsonProcessingException {
         log.info("Received order for course {} for user {}", request.courseId(), request.userId());
-        // 1. Save to database
+        // 1. Save Order to database
         Order order = new Order(
                 null,
                 request.userId(),
@@ -35,7 +38,7 @@ public class OrderService {
 
         order = orderRepository.save(order);
 
-        // 2. Publish to Kafka (dual-write)
+        // 2. Save Event to outbox table in same transaction
         OrderEvent event = new OrderEvent(
                 order.id(),
                 order.userId(),
@@ -43,8 +46,10 @@ public class OrderService {
                 order.amount(),
                 order.status()
         );
-        log.info("Saved order for course {} for user {}", request.courseId(), request.userId());
-        kafkaTemplate.send(ORDER_EVENTS_TOPIC, String.valueOf(order.id()), event);
+
+        OrderOutbox orderOutbox = new OrderOutbox(null, "ORDER", order.id(), "ORDER_CREATED", objectMapper.writeValueAsString(event), "NEW", null, null);
+        OrderOutbox savedOrderOutbox = orderOutboxRepository.save(orderOutbox);
+        log.info("Saved orderEvent to outbox table with id {} at timestamp {}", savedOrderOutbox.id(), savedOrderOutbox.createdAt());
 
         return order;
     }

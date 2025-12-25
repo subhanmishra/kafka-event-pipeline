@@ -1,5 +1,6 @@
 package com.subhanmishra.order;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,7 +18,7 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<Order> createOrder(@RequestBody OrderRequest request) {
+    public ResponseEntity<Order> createOrder(@RequestBody OrderRequest request) throws JsonProcessingException {
         Order order = orderService.createOrder(request);
         return ResponseEntity.ok(order);
     }

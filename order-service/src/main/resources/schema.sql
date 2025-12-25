@@ -11,3 +11,15 @@ CREATE TABLE IF NOT EXISTS orders (
                         INDEX idx_user_id (user_id),
                         INDEX idx_status (status)
 );
+
+CREATE TABLE IF NOT EXISTS outbox_events (
+                                             id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                             aggregate_type VARCHAR(100) NOT NULL,
+                                             aggregate_id BIGINT NOT NULL,
+                                             type VARCHAR(100) NOT NULL,
+                                             payload JSON NOT NULL,
+                                             status VARCHAR(20) NOT NULL DEFAULT 'NEW',
+                                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                             sent_at TIMESTAMP NULL,
+                                             INDEX idx_status_created_at (status, created_at)
+);
