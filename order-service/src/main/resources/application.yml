@@ -1,0 +1,43 @@
+server:
+  port: 8081 # Default port for order-service
+spring:
+  application:
+    name: order-service
+  virtual:
+    threads:
+      enabled: true
+  datasource:
+    url: jdbc:mysql://${DB_HOSTNAME:localhost}:${DB_PORT:3306}/${DB_NAME:edtech_orders}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        acks: all
+        retries: 3
+        delivery.timeout.ms: 120000
+        linger.ms: 10
+        request.timeout.ms: 60000
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+#  cloud:
+#    function:
+#      definition: orderSupplier
+#    stream:
+#      bindings:
+#        productSupplier-out-0: #a producer
+#          destination: order_events
+#      kafka:
+#        binder:
+#          brokers: localhost:9092
+#          noOfPartitions: 1
+#          replicationFactor: 1
+
+
