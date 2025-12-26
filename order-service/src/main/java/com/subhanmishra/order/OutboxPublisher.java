@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.List;
 
-@Component
+//@Component
 public class OutboxPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
@@ -27,7 +27,7 @@ public class OutboxPublisher {
         this.objectMapper = objectMapper;
     }
 
-    @Scheduled(fixedDelay = 1000) // every second
+    //@Scheduled(fixedDelay = 1000) // every second
     public void publishNewEvents() {
         List<OrderOutbox> events = orderOutboxRepository
                 .findTop100ByStatusOrderByCreatedAtAsc("NEW");

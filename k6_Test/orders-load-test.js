@@ -5,11 +5,11 @@ export const options = {
   scenarios: {
     orders_load: {
       executor: 'constant-arrival-rate',
-      rate: 10,              // 10 new orders per second
+      rate: 30,              // 10 new orders per second
       timeUnit: '1s',
-      duration: '20m',       // ~12,000 orders over 20 minutes
+      duration: '10m',       // ~12,000 orders over 20 minutes
       preAllocatedVUs: 50,
-      maxVUs: 200,
+      maxVUs: 300,
     },
   },
 };

@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Service
 public class OrderService {
 
@@ -47,7 +49,7 @@ public class OrderService {
                 order.status()
         );
 
-        OrderOutbox orderOutbox = new OrderOutbox(null, "ORDER", order.id(), "ORDER_CREATED", objectMapper.writeValueAsString(event), "NEW", null, null);
+        OrderOutbox orderOutbox = new OrderOutbox(null, "ORDER", order.id(), "ORDER_CREATED", objectMapper.writeValueAsString(event), "NEW", Instant.now(), null);
         OrderOutbox savedOrderOutbox = orderOutboxRepository.save(orderOutbox);
         log.info("Saved orderEvent to outbox table with id {} at timestamp {}", savedOrderOutbox.id(), savedOrderOutbox.createdAt());
 
