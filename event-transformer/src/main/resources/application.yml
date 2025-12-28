@@ -1,0 +1,16 @@
+server:
+  port: 8086
+spring:
+  application:
+    name: event-transformer
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: event-transformer-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
