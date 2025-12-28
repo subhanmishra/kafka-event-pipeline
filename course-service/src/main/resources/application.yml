@@ -21,4 +21,7 @@ spring:
         spring.json.trusted.packages: "*"
         spring.json.use.type.headers: false
         spring.json.value.default.type: com.subhanmishra.course.OrderEvent
+        auto.commit.interval.ms: 1000     # commit every second
+        max.poll.records: 50
       auto-offset-reset: earliest
+      enable-auto-commit: true            # realistic default in many apps
