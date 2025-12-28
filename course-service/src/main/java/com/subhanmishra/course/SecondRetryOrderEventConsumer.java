@@ -8,32 +8,34 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 @Component
-public class OrderEventConsumer {
+public class SecondRetryOrderEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderEventConsumer.class);
+    private static final Logger log = LoggerFactory.getLogger(SecondRetryOrderEventConsumer.class);
+
     private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
 
-    public OrderEventConsumer(KafkaTemplate<String, OrderEvent> kafkaTemplate) {
+    public SecondRetryOrderEventConsumer(KafkaTemplate<String, OrderEvent> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    @KafkaListener(topics = "order_events", groupId = "course-service-group")
+    @KafkaListener(
+            topics = "order.events.retry-200ms",
+            groupId = "course-service-retry-200ms"
+    )
     public void consume(OrderEvent event, Acknowledgment ack) {
         try {
+            // Backoff
+            Thread.sleep(200);
             activateCourse(event.courseId(), event.userId());
             ack.acknowledge();
-        } catch (TransientDownstreamException ex) {
-            log.warn("Transient failure for orderId={}, routing to retry-100ms", event.id());
-            kafkaTemplate.send("order.events.retry-100ms",
-                    String.valueOf(event.id()), event);
-            ack.acknowledge(); // We handled it by moving it to retry
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } catch (Exception ex) {
-            log.error("Unexpected failure for orderId={}, routing to DLQ", event.id(), ex);
+            log.error("Unexpected failure in 200ms retry, routing to DLQ for orderId={}", event.id(), ex);
             kafkaTemplate.send("order.events.dlq",
                     String.valueOf(event.id()), event);
             ack.acknowledge();
         }
-
     }
 
     private void activateCourse(Long courseId, Long userId) {

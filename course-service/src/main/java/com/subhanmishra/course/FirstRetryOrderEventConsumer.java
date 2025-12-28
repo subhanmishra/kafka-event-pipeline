@@ -8,32 +8,39 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 @Component
-public class OrderEventConsumer {
+public class FirstRetryOrderEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderEventConsumer.class);
+    private static final Logger log = LoggerFactory.getLogger(FirstRetryOrderEventConsumer.class);
+
     private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
 
-    public OrderEventConsumer(KafkaTemplate<String, OrderEvent> kafkaTemplate) {
+    public FirstRetryOrderEventConsumer(KafkaTemplate<String, OrderEvent> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    @KafkaListener(topics = "order_events", groupId = "course-service-group")
+    @KafkaListener(
+            topics = "order.events.retry-100ms",
+            groupId = "course-service-retry-100ms"
+    )
     public void consume(OrderEvent event, Acknowledgment ack) {
         try {
+            // Backoff
+            Thread.sleep(100);
             activateCourse(event.courseId(), event.userId());
             ack.acknowledge();
         } catch (TransientDownstreamException ex) {
-            log.warn("Transient failure for orderId={}, routing to retry-100ms", event.id());
-            kafkaTemplate.send("order.events.retry-100ms",
+            log.warn("Still failing after 100ms, routing to retry-200ms for orderId={}", event.id(), ex);
+            kafkaTemplate.send("order.events.retry-200ms",
                     String.valueOf(event.id()), event);
-            ack.acknowledge(); // We handled it by moving it to retry
+            ack.acknowledge();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } catch (Exception ex) {
-            log.error("Unexpected failure for orderId={}, routing to DLQ", event.id(), ex);
+            log.error("Unexpected failure in 100ms retry, routing to DLQ for orderId={}", event.id(), ex);
             kafkaTemplate.send("order.events.dlq",
                     String.valueOf(event.id()), event);
             ack.acknowledge();
         }
-
     }
 
     private void activateCourse(Long courseId, Long userId) {
