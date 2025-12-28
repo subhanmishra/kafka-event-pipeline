@@ -3,6 +3,14 @@ server:
 spring:
   application:
     name: course-service
+  datasource:
+    url: jdbc:mysql://${DB_HOSTNAME:localhost}:${DB_PORT:3306}/${DB_NAME:edtech_orders}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
