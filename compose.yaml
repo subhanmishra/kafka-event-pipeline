@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mysql:
     image: mysql:8.0
-    container_name: kaka_event_pipeline_mysql
+    container_name: mysql
     command: >
       --default-authentication-plugin=mysql_native_password
       --binlog-format=ROW
@@ -17,6 +17,66 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+
+  kafka:
+    image: bitnamilegacy/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+      - "29093:29093"
+    environment:
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Three listeners:
+      # - INTERNAL: for inter-broker and internal containers (e.g. Kafdrop)
+      # - EXTERNAL: for host applications (Spring Boot services)
+      # - CONNECT: for Kafka Connect / Debezium
+      KAFKA_CFG_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONNECT://:29093,CONTROLLER://:9093
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONNECT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092,CONNECT://kafka:29093
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+
+  connect:
+    image: debezium/connect:2.7.2.Final
+    container_name: connect
+    depends_on:
+      - kafka
+    environment:
+      # Use the CONNECT listener so metadata advertises kafka:29093,
+      # which is reachable from this container.
+      BOOTSTRAP_SERVERS: kafka:29093
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect-configs
+      OFFSET_STORAGE_TOPIC: connect-offsets
+      STATUS_STORAGE_TOPIC: connect-status
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      REST_ADVERTISED_HOST_NAME: connect
+    ports:
+      - "8083:8083"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka_ui_provectuslab
+    depends_on:
+      - kafka
+    ports:
+      - "7777:8080"
+    restart: unless-stopped
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=kafka
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+
+volumes:
+  mysql_data:
 
 #  zookeeper:
 #    image: "confluentinc/cp-zookeeper:6.2.4"
@@ -52,81 +112,21 @@ services:
 #      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 100
 #      CONFLUENT_METRICS_ENABLE: 'false'
 
-  kafka:
-    image: bitnamilegacy/kafka:latest
-    container_name: kafka-event-pipeline_kafka
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-      - "29093:29093"
-    environment:
-      KAFKA_CFG_NODE_ID: 1
-      KAFKA_CFG_PROCESS_ROLES: broker,controller
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      # Three listeners:
-      # - INTERNAL: for inter-broker and internal containers (e.g. Kafdrop)
-      # - EXTERNAL: for host applications (Spring Boot services)
-      # - CONNECT: for Kafka Connect / Debezium
-      KAFKA_CFG_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONNECT://:29093,CONTROLLER://:9093
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONNECT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092,CONNECT://kafka:29093
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
-      ALLOW_PLAINTEXT_LISTENER: "yes"
-
-  connect:
-    image: debezium/connect:2.7.2.Final
-    container_name: kaka_event_pipeline_connect
-    depends_on:
-      - kafka
-    environment:
-      # Use the CONNECT listener so metadata advertises kafka:29093,
-      # which is reachable from this container.
-      BOOTSTRAP_SERVERS: kafka:29093
-      GROUP_ID: 1
-      CONFIG_STORAGE_TOPIC: connect-configs
-      OFFSET_STORAGE_TOPIC: connect-offsets
-      STATUS_STORAGE_TOPIC: connect-status
-      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-      REST_ADVERTISED_HOST_NAME: connect
-    ports:
-      - "8083:8083"
-
-  akhq:
-    container_name: kaka_event_pipeline_kafka-ui-akhq
-    image: tchiotludo/akhq
-    restart: unless-stopped
-    ports:
-      - 8080:8080
-    environment:
-      AKHQ_CONFIGURATION: |
-        akhq:
-          connections:
-            docker-kafka-server:
-              properties:
-                bootstrap.servers: "kafka:29092"
-  #              schema-registry:
-  #                url: "http://schema-registry:8081"
-  #              connect:
-  #                - name: "connect"
-  #                  url: "http://kafka-connect:8083"
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui
-    container_name: kaka_event_pipeline_kafka-ui-provectuslab
-    depends_on:
-      - kafka
-    ports:
-      - "7777:8080"
-    restart: unless-stopped
-    environment:
-      - KAFKA_CLUSTERS_0_NAME=kafka
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
-
-volumes:
-  mysql_data:
+#  akhq:
+#    container_name: kaka_event_pipeline_kafka_ui_akhq
+#    image: tchiotludo/akhq
+#    restart: unless-stopped
+#    ports:
+#      - 8080:8080
+#    environment:
+#      AKHQ_CONFIGURATION: |
+#        akhq:
+#          connections:
+#            docker-kafka-server:
+#              properties:
+#                bootstrap.servers: "kafka:29092"
+#  #              schema-registry:
+#  #                url: "http://schema-registry:8081"
+#  #              connect:
+#  #                - name: "connect"
+#  #                  url: "http://kafka-connect:8083"
