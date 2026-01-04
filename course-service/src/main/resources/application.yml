@@ -20,3 +20,7 @@ spring:
       enable-auto-commit: false
     listener:
       ack-mode: manual_immediate
+  redis:
+    host: localhost
+    port: 6379
+

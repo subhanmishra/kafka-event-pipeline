@@ -12,15 +12,25 @@ public class OrderEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(OrderEventConsumer.class);
     private final KafkaTemplate<String, OrderEvent> kafkaTemplate;
+    private final IdempotencyService idempotencyService;
 
-    public OrderEventConsumer(KafkaTemplate<String, OrderEvent> kafkaTemplate) {
+    public OrderEventConsumer(KafkaTemplate<String, OrderEvent> kafkaTemplate, IdempotencyService idempotencyService) {
         this.kafkaTemplate = kafkaTemplate;
+        this.idempotencyService = idempotencyService;
     }
 
     @KafkaListener(topics = "order_events", groupId = "course-service-group")
     public void consume(OrderEvent event, Acknowledgment ack) {
+        String idempotencyKey = "idempotency:course-service:" + event.eventId();
+        // If we've seen this eventId before, skip side effects
+        if (idempotencyService.isDone(idempotencyKey)) {
+            log.info("Skipping duplicate eventId={} for orderId={} for courseId={} userId={}", event.eventId(), event.id(), event.courseId(), event.userId());
+            ack.acknowledge();
+            return;
+        }
         try {
             activateCourse(event.courseId(), event.userId());
+            idempotencyService.markDone(idempotencyKey); // mark as processed
             ack.acknowledge();
         } catch (TransientDownstreamException ex) {
             log.warn("Transient failure for orderId={}, routing to retry-100ms", event.id());

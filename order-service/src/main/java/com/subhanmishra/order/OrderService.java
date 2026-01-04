@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Service
 public class OrderService {
@@ -46,6 +47,8 @@ public class OrderService {
                 order.userId(),
                 order.courseId(),
                 order.amount(),
+                "ORDER_CREATED",
+                UUID.randomUUID().toString(),
                 order.status()
         );
 
